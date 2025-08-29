@@ -3,140 +3,149 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BullyGuard</title>
-  <link rel="manifest" href="manifest.json">
+  <title>🛡️ Bullying Detector</title>
+
+  <!-- PWA Meta Tags -->
   <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bullying Detector">
+
+  <link rel="manifest" href="manifest.json">
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: linear-gradient(135deg,#667eea,#764ba2);
-      color: #fff;
-      margin: 0; padding: 20px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      text-align: center;
     }
-    .container { max-width: 420px; margin: auto; }
-    .btn {
-      width: 100%; padding: 14px; border: none; border-radius: 25px;
-      margin-top: 10px; font-weight: bold; cursor: pointer;
+    header {
+      padding: 20px;
+      font-size: 1.6em;
+      font-weight: bold;
+      background: rgba(0,0,0,0.2);
     }
-    .btn-camera { background: #ff6b6b; color:#fff; }
-    .btn-gallery { background: #4ecdc4; color:#fff; }
-    .results-section, #report-section {
-      background: rgba(255,255,255,0.1);
-      border-radius: 15px; padding: 15px; margin-top: 20px;
-      display: none;
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
     }
-    #locationInput {
-      width: 100%; padding: 10px; border-radius: 8px; margin-bottom: 10px;
+    .camera-section {
+      margin: 20px 0;
+    }
+    video, canvas {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      margin-bottom: 10px;
+    }
+    button {
+      background: #ffcc00;
       border: none;
+      padding: 12px 20px;
+      margin: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: 0.3s;
     }
-    .upload-area {
-      border: 2px dashed rgba(255,255,255,0.6); border-radius: 15px;
-      text-align: center; padding: 40px 20px; cursor: pointer;
+    button:hover {
+      background: #ffaa00;
     }
-    .preview-image { max-width: 100%; margin-top: 15px; border-radius: 8px; }
+    .results {
+      margin-top: 20px;
+      font-size: 1.1em;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🛡️ BullyGuard</h1>
-    <p>Detect and Report Bullying</p>
-
-    <!-- Upload -->
-    <div class="upload-area" id="upload-area">
-      <p>📸 Tap to take or upload a photo</p>
+  <header>🛡️ Bullying Detector</header>
+  <main>
+    <div class="camera-section">
+      <video id="video" autoplay playsinline></video>
+      <br>
+      <button onclick="capturePhoto()">📸 Capture</button>
+      <input type="file" accept="image/*" onchange="uploadImage(event)">
+      
+      <!-- Always visible report button -->
+      <button 
+        onclick="reportBullying()" 
+        style="width:100%; margin-top:20px; padding:18px; border:none; border-radius:12px; font-size:1.2em; font-weight:bold; background:linear-gradient(45deg,#ff6b6b,#ee5a52); color:white; cursor:pointer; box-shadow:0 6px 12px rgba(0,0,0,0.3);"
+      >
+        📩 Report Bullying
+      </button>
     </div>
-    <input type="file" id="file-input-camera" accept="image/*" capture="environment" hidden>
-    <input type="file" id="file-input-gallery" accept="image/*" hidden>
-    <button class="btn btn-camera" onclick="takePhoto()">📷 Take Photo</button>
-    <button class="btn btn-gallery" onclick="openGallery()">🖼️ Choose from Gallery</button>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="results" id="results"></div>
+  </main>
 
-    <!-- Loading -->
-    <div id="loading" style="display:none;text-align:center;">
-      <p>🔍 Analyzing...</p>
-    </div>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const resultsDiv = document.getElementById('results');
 
-    <!-- Results -->
-    <div id="results" class="results-section">
-      <h3>📊 Detection Results</h3>
-      <div id="results-content"></div>
-    </div>
+    // Open camera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { console.error("Camera error:", err); });
 
-    <!-- Report Bullying -->
-    <div id="report-section">
-      <input type="text" id="locationInput" placeholder="Enter location (e.g. Class 5A)">
-      <button class="btn btn-camera" onclick="reportBullying()">📨 Report Bullying</button>
-    </div>
-  </div>
+    function capturePhoto() {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+      canvas.toBlob(uploadToServer, 'image/jpeg');
+    }
 
-<script>
-const ROBOFLOW_API_KEY = "1RuIGDSVW5gVOPaIq5I7";
-const MODEL_ENDPOINT = "https://detect.roboflow.com/bullying-detection-lixke-xxmrf/1";
+    function uploadImage(event) {
+      const file = event.target.files[0];
+      if (file) uploadToServer(file);
+    }
 
-const fileInputCamera = document.getElementById('file-input-camera');
-const fileInputGallery = document.getElementById('file-input-gallery');
-const uploadArea = document.getElementById('upload-area');
-const loading = document.getElementById('loading');
-const results = document.getElementById('results');
-const resultsContent = document.getElementById('results-content');
+    function uploadToServer(file) {
+      const formData = new FormData();
+      formData.append("file", file);
 
-fileInputCamera.addEventListener('change', e => handleFile(e.target.files[0]));
-fileInputGallery.addEventListener('change', e => handleFile(e.target.files[0]));
+      fetch("https://your-server-endpoint/analyze", {
+        method: "POST",
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => displayResults(data))
+      .catch(err => {
+        console.error("Error:", err);
+        resultsDiv.textContent = "⚠️ Error analyzing image.";
+      });
+    }
 
-uploadArea.addEventListener('click', ()=> fileInputGallery.click());
+    function displayResults(data) {
+      resultsDiv.innerHTML = "";
+      if (data.bullying_detected) {
+        resultsDiv.innerHTML = "🚨 Bullying detected!";
+      } else {
+        resultsDiv.innerHTML = "✅ No bullying detected.";
+      }
+    }
 
-function takePhoto(){ fileInputCamera.click(); }
-function openGallery(){ fileInputGallery.click(); }
+    function reportBullying() {
+      const message = "🚨 Bullying detected! Please go to the reported location immediately.";
+      openSmsWithBody(message);
+    }
 
-function handleFile(file){
-  if(!file) return;
-  if(!file.type.startsWith("image/")){ alert("Please select an image"); return; }
-  const reader=new FileReader();
-  reader.onload = e => showPreview(e.target.result);
-  reader.readAsDataURL(file);
-  analyzeImage(file);
-}
-function showPreview(src){
-  document.querySelectorAll(".preview-image").forEach(el=>el.remove());
-  const img=document.createElement("img");
-  img.src=src; img.className="preview-image";
-  uploadArea.appendChild(img);
-}
-async function analyzeImage(file){
-  loading.style.display="block"; results.style.display="none";
-  try {
-    const formData=new FormData(); formData.append("file",file);
-    const resp=await fetch(`${MODEL_ENDPOINT}?api_key=${ROBOFLOW_API_KEY}&confidence=40&overlap=30`,{
-      method:"POST", body:formData
-    });
-    if(!resp.ok) throw new Error("API failed");
-    const result=await resp.json();
-    displayResults(result);
-  } catch(err){
-    resultsContent.innerText="❌ Error: "+err.message;
-    results.style.display="block";
-  } finally {
-    loading.style.display="none";
-  }
-}
-function displayResults(result){
-  results.style.display="block"; resultsContent.innerHTML="";
-  if(result.predictions && result.predictions.length>0){
-    const div=document.createElement("div");
-    div.innerHTML=`🚨 Bullying Detected! Found ${result.predictions.length} incident(s).`;
-    resultsContent.appendChild(div);
-  } else {
-    resultsContent.innerText="✅ No bullying detected.";
-  }
-  document.getElementById("report-section").style.display="block";
-}
-function reportBullying(){
-  const loc=document.getElementById("locationInput").value.trim();
-  if(!loc){ alert("Enter location first."); return; }
-  let text="🚨 Bullying Report\nLocation: "+loc+"\n\nResults:\n";
-  text+=resultsContent.innerText || "No results.";
-  const phone="1234567890"; // change this to hotline #
-  window.location.href=`sms:${phone}?body=${encodeURIComponent(text)}`;
-}
-</script>
+    function openSmsWithBody(body) {
+      const encoded = encodeURIComponent(body);
+      window.location.href = `sms:?&body=${encoded}`;
+    }
+  </script>
 </body>
 </html>
+
